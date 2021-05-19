@@ -28,10 +28,10 @@ namespace FraudDetectionTrill
                 new TransactionRecord(3, 4, 12345, 10, 3745),
                 new TransactionRecord(6, 5, 23456, 6, 8083),
                 new TransactionRecord(7, 6, 34567, 20, 6789),
-                new TransactionRecord(7, 7, 12345, 15, 9785), //high frequency
+                new TransactionRecord(7, 7, 12345, 15, 9785), //high velocity
                 new TransactionRecord(9, 8, 34567, 13, 1545),
-                new TransactionRecord(10, 9, 23456, 9, 9785), //high frequency
-                new TransactionRecord(10, 10, 12345, 10, 9785), //high frequency
+                new TransactionRecord(10, 9, 23456, 9, 9785), //high velocity
+                new TransactionRecord(10, 10, 12345, 10, 9785), //high velocity
                 new TransactionRecord(12, 11, 23456, 5, 1545),
                 new TransactionRecord(14, 12, 34567, 8, 1545),
                 new TransactionRecord(14, 13, 23456, 100, 4046), //large qty
@@ -97,6 +97,11 @@ namespace FraudDetectionTrill
                 .ToStreamEventObservable() 
                 .Where(e => e.IsData) 
                 .ForEachAsync(e => Console.WriteLine(e.ToString()));
+            
+            //largeQty                
+            //    .ToStreamEventObservable() 
+            //    .Where(e => e.IsData) 
+            //    .ForEachAsync(e => Console.WriteLine(e.ToString()));
             
         }
     }
