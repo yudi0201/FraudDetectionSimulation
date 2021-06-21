@@ -1,6 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using Microsoft.VisualBasic.FileIO;
+using System.Linq;
 using System.Reactive;
+using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Runtime.InteropServices;
 using System.Xml.Xsl;
@@ -17,43 +22,91 @@ namespace FraudDetectionTrill
 {
     class Program
     {
+        class TransactionRecord
+        {
+            public long Tick;
+            public long TxnID;
+            public long ItemNo;
+            public long Qty;
+            public long CardNum;
+
+            public TransactionRecord(long tick, long txnID, long itemNo, long qty, long cardNum)
+            {
+                this.Tick = tick;
+                this.TxnID = txnID;
+                this.ItemNo = itemNo;
+                this.Qty = qty;
+                this.CardNum = cardNum;
+            }
+        }
+
+        class MyObservable : IObservable<TransactionRecord>
+        {
+            public IDisposable Subscribe(IObserver<TransactionRecord> observer)
+            {
+                using (var reader = new StreamReader(@"/home/yudi/Code/pysparkPrograms/data/frauddetection/synthetic_txn_data_1_thousand_UNIX.csv"))
+                {
+                  reader.ReadLine();
+                  while (!reader.EndOfStream)
+                  {
+                      var line = reader.ReadLine();
+                      var values = line.Split(',');
+                      var data = new TransactionRecord((long)Convert.ToDouble(values[0]), long.Parse(values[1]), long.Parse(values[2]), long.Parse(values[3]), long.Parse(values[4]));
+                      observer.OnNext(data);
+
+                  }
+                }
+                observer.OnCompleted();
+                return Disposable.Empty;
+            }
+        }
         static void Main(string[] args)
         {
-            var transactionRecordObservable = new[]
-            {
+            
+            //var transactionRecordObservable = new[]
+            //{
                 //This should be done in a separate file, but I still need to learn how to read files in C#.
-                new TransactionRecord(0, 1, 12345, 5, 6789),
-                new TransactionRecord(2, 2, 23456, 10, 4046),
-                new TransactionRecord(3, 3, 34567, 7, 5874),
-                new TransactionRecord(3, 4, 12345, 10, 3745),
-                new TransactionRecord(6, 5, 23456, 6, 8083),
-                new TransactionRecord(7, 6, 34567, 20, 6789),
-                new TransactionRecord(7, 7, 12345, 15, 9785), //high velocity
-                new TransactionRecord(9, 8, 34567, 13, 1545),
-                new TransactionRecord(10, 9, 23456, 9, 9785), //high velocity
-                new TransactionRecord(10, 10, 12345, 10, 9785), //high velocity
-                new TransactionRecord(12, 11, 23456, 5, 1545),
-                new TransactionRecord(14, 12, 34567, 8, 1545),
-                new TransactionRecord(14, 13, 23456, 100, 4046), //large qty
-                new TransactionRecord(15, 14, 12345, 100, 4046), //large qty
-                new TransactionRecord(17, 15, 23456, 14, 8083),
-                new TransactionRecord(19, 16, 34567, 18, 2953),
-                new TransactionRecord(20, 17, 34567, 100, 3875) //large qty
-            }.ToObservable();
+            //    new TransactionRecord(0, 1, 12345, 5, 6789),
+            //    new TransactionRecord(2, 2, 23456, 10, 4046),
+            //    new TransactionRecord(3, 3, 34567, 7, 5874),
+            //    new TransactionRecord(3, 4, 12345, 10, 3745),
+            //    new TransactionRecord(6, 5, 23456, 6, 8083),
+            //    new TransactionRecord(7, 6, 34567, 20, 6789),
+            //    new TransactionRecord(7, 7, 12345, 15, 9785), //high velocity
+            //    new TransactionRecord(9, 8, 34567, 13, 1545),
+            //    new TransactionRecord(10, 9, 23456, 9, 9785), //high velocity
+            //    new TransactionRecord(10, 10, 12345, 10, 9785), //high velocity
+            //    new TransactionRecord(12, 11, 23456, 5, 1545),
+            //    new TransactionRecord(14, 12, 34567, 8, 1545),
+            //    new TransactionRecord(14, 13, 23456, 100, 4046), //large qty
+            //    new TransactionRecord(15, 14, 12345, 100, 4046), //large qty
+            //    new TransactionRecord(17, 15, 23456, 14, 8083),
+            //    new TransactionRecord(19, 16, 34567, 18, 2953),
+            //    new TransactionRecord(20, 17, 34567, 100, 3875) //large qty
+            //}.ToObservable();
+            
+            //var transactionRecordStreamable =
+            //    transactionRecordObservable.Select(e => StreamEvent.CreateInterval(e.Tick, e.Tick + 1, e))
+            //        .ToStreamable(DisorderPolicy.Drop());
 
+            var transactionRecordObservable = new MyObservable();
             var transactionRecordStreamable =
-                transactionRecordObservable.Select(e => StreamEvent.CreateInterval(e.Tick, e.Tick + 1, e))
-                    .ToStreamable(DisorderPolicy.Drop());
-
-            var allTransactions =
-                transactionRecordStreamable.Select(e => new{e.TxnID, e.ItemNo, e.Qty, e.CardNum}); //used to display all transactions initiated above.
+                transactionRecordObservable.ToTemporalStreamable(e => e.Tick, e => e.Tick + 1)
+                    .Cache();
+            
+            //var allTransactions =
+            //    transactionRecordStreamable.Select(e => new{e.TxnID, e.ItemNo, e.Qty, e.CardNum}); //used to display all transactions initiated above.
             
             //Large Transaction Quantities
             //Computes a moving average and stdev (with window size given by largeQtyWindowSize) of the quantity purchased for each individual item
             //for all the transactions of that item which fall within the window. The moving average is computed every second (i.e.continuously).
             //If a new transaction of that item has a quantity that exceeds the value of (moving average + 3 * stdev) in the previous window,
             //that new transaction is reported as a potentially fraudulent transaction.
-            int largeQtyWindowSize = 10;
+
+            var sw = new Stopwatch();
+            sw.Start();
+            
+            int largeQtyWindowSize = 50;
             var qtyStat = transactionRecordStreamable.GroupApply(e => e.ItemNo,
                 s => s.HoppingWindowLifetime(largeQtyWindowSize, 1)
                     .Aggregate(w => w.Average(e => e.Qty),
@@ -78,50 +131,35 @@ namespace FraudDetectionTrill
             // Detects high frequency purchase from the same card number. 
             // If the same card number completes "maxTxns" or more transactions within "windowSize", this query will return
             // all of the transactions made by that card within that window. 
-            int windowSize = 5;
-            int maxTxns = 3;
-            var txnByCard = transactionRecordStreamable.GroupApply(e => e.CardNum,
-                s => s.HoppingWindowLifetime(windowSize, 1).Count(),
-                (g, p) => new {cardNum = g.Key, numTxn = p}); //group transactions by card number and counts the number of transactions per window.
             
-            var txnExtended = transactionRecordStreamable.ExtendLifetime(windowSize); 
+            //int windowSize = 5;
+            //int maxTxns = 3;
+            //var txnByCard = transactionRecordStreamable.GroupApply(e => e.CardNum,
+            //    s => s.HoppingWindowLifetime(windowSize, 1).Count(),
+            //    (g, p) => new {cardNum = g.Key, numTxn = p}); //group transactions by card number and counts the number of transactions per window.
+            
+            //var txnExtended = transactionRecordStreamable.ExtendLifetime(windowSize); 
 
-            var highVelocityTxn = txnByCard.Join(txnExtended, e => e.cardNum, e => e.CardNum,
-                (left, right) => new {left.cardNum, left.numTxn, right})
-                .Where(e=>(int) e.numTxn >= maxTxns)
-                .Select(e=>new{e.cardNum,e.right.TxnID}); //final results
+            //var highVelocityTxn = txnByCard.Join(txnExtended, e => e.cardNum, e => e.CardNum,
+            //    (left, right) => new {left.cardNum, left.numTxn, right})
+            //    .Where(e=>(int) e.numTxn >= maxTxns)
+            //    .Select(e=>new{e.cardNum,e.right.TxnID}); //final results
             
             //Question: Is there a better way to get all the offending high-frequency transactions with their origianl start and end times?
 
-            highVelocityTxn
-                .ToStreamEventObservable() 
-                .Where(e => e.IsData) 
-                .ForEachAsync(e => Console.WriteLine(e.ToString()));
-            
-            //largeQty                
-            //    .ToStreamEventObservable() 
-            //    .Where(e => e.IsData) 
+            //largeQty
+            //    .ToStreamEventObservable()
             //    .ForEachAsync(e => Console.WriteLine(e.ToString()));
+
+            largeQty
+                .ToStreamEventObservable()
+                .Wait();
             
+            sw.Stop();
+            Console.WriteLine(sw.Elapsed.TotalSeconds);
         }
     }
     
-    class TransactionRecord
-    {
-        public long Tick;
-        public long TxnID;
-        public long ItemNo;
-        public long Qty;
-        public long CardNum;
 
-        public TransactionRecord(long tick, long txnID, long itemNo, long qty, long cardNum)
-        {
-            this.Tick = tick;
-            this.TxnID = txnID;
-            this.ItemNo = itemNo;
-            this.Qty = qty;
-            this.CardNum = cardNum;
-        }
-    }
 
 }
