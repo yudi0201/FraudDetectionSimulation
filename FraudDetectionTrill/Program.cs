@@ -147,16 +147,16 @@ namespace FraudDetectionTrill
             
             //Question: Is there a better way to get all the offending high-frequency transactions with their origianl start and end times?
 
-            //largeQty
-            //    .ToStreamEventObservable()
-            //    .ForEachAsync(e => Console.WriteLine(e.ToString()));
-
             largeQty
                 .ToStreamEventObservable()
-                .Wait();
+                .ForEachAsync(e => Console.WriteLine(e.ToString()));
+
+            //largeQty
+            //    .ToStreamEventObservable()
+            //    .Wait();
             
-            sw.Stop();
-            Console.WriteLine(sw.Elapsed.TotalSeconds);
+            //sw.Stop();
+            //Console.WriteLine(sw.Elapsed.TotalSeconds);
         }
     }
     
