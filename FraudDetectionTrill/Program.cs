@@ -44,7 +44,7 @@ namespace FraudDetectionTrill
         {
             public IDisposable Subscribe(IObserver<TransactionRecord> observer)
             {
-                using (var reader = new StreamReader(@"/home/yudi/Code/pysparkPrograms/data/frauddetection/synthetic_txn_data_1_thousand_UNIX.csv"))
+                using (var reader = new StreamReader(@"/root/FraudDetectionSimulation/synthetic_txn_data_1_thousand_UNIX.csv"))
                 {
                   reader.ReadLine();
                   while (!reader.EndOfStream)
