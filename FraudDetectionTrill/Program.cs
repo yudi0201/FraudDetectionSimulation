@@ -44,7 +44,7 @@ namespace FraudDetectionTrill
         {
             public IDisposable Subscribe(IObserver<TransactionRecord> observer)
             {
-                using (var reader = new StreamReader(@"/root/FraudDetectionSimulation/synthetic_txn_data_100_thousand_UNIX.csv"))
+                using (var reader = new StreamReader(@"/root/FraudDetectionSimulation/synthetic_txn_data_1_million_UNIX.csv"))
                 //using (var reader = new StreamReader(@"C:\Users\yudis\Documents\university\Summer2021\Code\FraudDetectionSimulation\synthetic_txn_data_1_thousand_UNIX.csv"))
                 
                 {
