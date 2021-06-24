@@ -44,7 +44,7 @@ namespace FraudDetectionTrill
         {
             public IDisposable Subscribe(IObserver<TransactionRecord> observer)
             {
-                using (var reader = new StreamReader(@"/root/FraudDetectionSimulation/synthetic_txn_data_100_thousand_UNIX.csv"))
+                using (var reader = new StreamReader(@"/root/FraudDetectionSimulation/synthetic_txn_data_1_million_UNIX.csv"))
                 //using (var reader = new StreamReader(@"C:\Users\yudis\Documents\university\Summer2021\Code\FraudDetectionSimulation\synthetic_txn_data_1_thousand_UNIX.csv"))
                 
                 {
@@ -90,11 +90,13 @@ namespace FraudDetectionTrill
             //var transactionRecordStreamable =
             //    transactionRecordObservable.Select(e => StreamEvent.CreateInterval(e.Tick, e.Tick + 1, e))
             //        .ToStreamable(DisorderPolicy.Drop());
+            
+            var sw = new Stopwatch();
+            sw.Start();
 
             var transactionRecordObservable = new MyObservable();
             var transactionRecordStreamable =
-                transactionRecordObservable.ToTemporalStreamable(e => e.Tick, e => e.Tick + 1)
-                    .Cache();
+                transactionRecordObservable.ToTemporalStreamable(e => e.Tick, e => e.Tick + 1);
             
             //var allTransactions =
             //    transactionRecordStreamable.Select(e => new{e.TxnID, e.ItemNo, e.Qty, e.CardNum}); //used to display all transactions initiated above.
@@ -105,8 +107,7 @@ namespace FraudDetectionTrill
             //If a new transaction of that item has a quantity that exceeds the value of (moving average + 3 * stdev) in the previous window,
             //that new transaction is reported as a potentially fraudulent transaction.
 
-            var sw = new Stopwatch();
-            sw.Start();
+
             
             int largeQtyWindowSize = 50;
             var qtyStat = transactionRecordStreamable.GroupApply(e => e.ItemNo,
