@@ -109,25 +109,25 @@ namespace FraudDetectionTrill
 
 
             
-            int largeQtyWindowSize = 50;
-            var qtyStat = transactionRecordStreamable.GroupApply(e => e.ItemNo,
-                s => s.HoppingWindowLifetime(largeQtyWindowSize, 1)
-                    .Aggregate(w => w.Average(e => e.Qty),
-                        w => w.StandardDeviation(e => e.Qty),
-                        (avgQty, stdevQty) => new {avgQty, stdevQty}),
-                (g, p) => new {itemNo = g.Key, qtyStat = p}) //computes the average and stdev  
-                .ShiftEventLifetime(1); //shift one unit to ensure that when joined with the original stream, each individual transaction in the original stream is mapped 
+            //int largeQtyWindowSize = 50;
+            //var qtyStat = transactionRecordStreamable.GroupApply(e => e.ItemNo,
+            //    s => s.HoppingWindowLifetime(largeQtyWindowSize, 1)
+            //        .Aggregate(w => w.Average(e => e.Qty),
+            //            w => w.StandardDeviation(e => e.Qty),
+            //            (avgQty, stdevQty) => new {avgQty, stdevQty}),
+            //    (g, p) => new {itemNo = g.Key, qtyStat = p}) //computes the average and stdev  
+            //    .ShiftEventLifetime(1); //shift one unit to ensure that when joined with the original stream, each individual transaction in the original stream is mapped 
                                         //with the average and stdev computed previously, excluding the present transaction which is being
                                         //examined for potential fraud.   
                                         //Question: is there a way to remove a fraudulent event once it is detected so that it doesn't contribute
                                         //to future averages and stdev's?
 
-            var combinedWithOrig = qtyStat.Join(transactionRecordStreamable, e => e.itemNo, e => e.ItemNo,
-                (left, right) => new {left.itemNo, left.qtyStat, right.TxnID, right.Qty});
+            //var combinedWithOrig = qtyStat.Join(transactionRecordStreamable, e => e.itemNo, e => e.ItemNo,
+            //    (left, right) => new {left.itemNo, left.qtyStat, right.TxnID, right.Qty});
 
-            var largeQty = combinedWithOrig.Where(e =>
-                e.Qty > e.qtyStat.avgQty + 3 * e.qtyStat.stdevQty)
-                .Select(e=>new{e.TxnID, e.itemNo, e.Qty, e.qtyStat}); //gives final results of potentially
+            //var largeQty = combinedWithOrig.Where(e =>
+            //    e.Qty > e.qtyStat.avgQty + 3 * e.qtyStat.stdevQty)
+            //    .Select(e=>new{e.TxnID, e.itemNo, e.Qty, e.qtyStat}); //gives final results of potentially
                                                                                     //fraudulent transactions.
             
             // High Velocity Transactions
@@ -135,18 +135,18 @@ namespace FraudDetectionTrill
             // If the same card number completes "maxTxns" or more transactions within "windowSize", this query will return
             // all of the transactions made by that card within that window. 
             
-            //int windowSize = 10;
-            //int maxTxns = 3;
-            //var txnByCard = transactionRecordStreamable.GroupApply(e => e.CardNum,
-            //    s => s.HoppingWindowLifetime(windowSize, 1).Count(),
-            //    (g, p) => new {cardNum = g.Key, numTxn = p}); //group transactions by card number and counts the number of transactions per window.
+            int windowSize = 10;
+            int maxTxns = 3;
+            var txnByCard = transactionRecordStreamable.GroupApply(e => e.CardNum,
+                s => s.HoppingWindowLifetime(windowSize, 1).Count(),
+                (g, p) => new {cardNum = g.Key, numTxn = p}); //group transactions by card number and counts the number of transactions per window.
             
-            //var txnExtended = transactionRecordStreamable.ExtendLifetime(windowSize); 
+            var txnExtended = transactionRecordStreamable.ExtendLifetime(windowSize); 
 
-            //var highVelocityTxn = txnByCard.Join(txnExtended, e => e.cardNum, e => e.CardNum,
-            //    (left, right) => new {left.cardNum, left.numTxn, right})
-            //    .Where(e=>(int) e.numTxn >= maxTxns)
-            //    .Select(e=>new{e.cardNum,e.right.TxnID}); //final results
+            var highVelocityTxn = txnByCard.Join(txnExtended, e => e.cardNum, e => e.CardNum,
+                (left, right) => new {left.cardNum, left.numTxn, right})
+                .Where(e=>(int) e.numTxn >= maxTxns)
+                .Select(e=>new{e.cardNum,e.right.TxnID}); //final results
             
             //Question: Is there a better way to get all the offending high-frequency transactions with their origianl start and end times?
 
@@ -154,7 +154,7 @@ namespace FraudDetectionTrill
             //    .ToStreamEventObservable()
             //    .ForEachAsync(e => Console.WriteLine(e.ToString()));
 
-            largeQty
+            highVelocityTxn
                 .ToStreamEventObservable()
                 .Wait();
             
