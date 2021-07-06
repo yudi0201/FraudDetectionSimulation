@@ -28,7 +28,7 @@ if __name__ == "__main__":
         .format("csv")\
         .option("maxFilesPerTrigger", 2)\
         .option("header", True)\
-        .option("path", "./data/frauddetection")\
+        .option("path", "./data/spark_stream_dir")\
         .schema(schema)\
         .load()
     
